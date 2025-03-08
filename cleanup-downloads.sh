@@ -44,11 +44,14 @@ get_qbittorrent_files() {
     curl -s --cookie "$cookie_file" "$url/api/v2/torrents/info" | jq -r '.[].content_path'
 }
 
+
+echo "Mapping inodes"
 # Extract inodes from DOWNLOADS_DIR in one pass
 declare -A DOWNLOADS_INODES
 while read -r inode; do
     DOWNLOADS_INODES["$inode"]=1
 done < <(find "$DOWNLOADS_DIR" -type f -exec stat -c "%i" {} \; | sort -u)
+
 
 # Check if Jellyfin files exist in DOWNLOADS_DIR
 get_jellyfin_hardlinks() {
@@ -76,18 +79,18 @@ while IFS=" " read -r instance_name url user pass; do
         continue
     fi
 
-    cookie_file="TEMPDIR/TEMP_DIR/(echo "$url" | md5sum | cut -d ' ' -f1)_cookie.txt"
+    cookie_file="$TEMP_DIR/$(echo "$url" | md5sum | cut -d ' ' -f1)_cookie.txt"
 
-    echo "[instancename]Authenticatingwithinstance_name] Authenticating with url..."
-    qb_login "url""url" "user" "pass""pass" "cookie_file"
+    echo "[$instance_name] Authenticating with $url..."
+    qb_login "$url" "$user" "$pass" "$cookie_file"
 
-    echo "[instancename]Fetchingfilesfrominstance_name] Fetching files from url..."
-    get_qbittorrent_files "url""url" "cookie_file" >> "$TEMP_DIR/qb-files.txt"
+    echo "[$instance_name] Fetching files from $url..."
+    get_qbittorrent_files "$url" "$cookie_file" >> "$TEMP_DIR/qb-files.txt"
 done < "$QB_INSTANCES_FILE"
 
 # Sort qBittorrent output
 echo "Sorting list of qBittorrent files"
-sort -u "TEMPDIR/qb−files.txt"−o"TEMP_DIR/qb-files.txt" -o "TEMP_DIR/qb-files.txt"
+sort -u "$TEMP_DIR/qb-files.txt" -o "$TEMP_DIR/qb-files.txt"
 
 # Get Jellyfin hard-linked files
 echo "Finding hardlinked files from $JELLYFIN_DIR"
@@ -95,11 +98,11 @@ get_jellyfin_hardlinks > "$TEMP_DIR/jellyfin-files.txt"
 
 # Get all files in /downloads (excluding directories)
 echo "Building list of files in $DOWNLOADS_DIR"
-find "DOWNLOADSDIR""DOWNLOADS_DIR" "{EXCLUDE_PATHS[@]}" -type f -print | sort > "$TEMP_DIR/all-files.txt"
+find "$DOWNLOADS_DIR" "${EXCLUDE_PATHS[@]}" -type f -print | sort > "$TEMP_DIR/all-files.txt"
 
 # Combine qBittorrent and Jellyfin file lists
 echo "Combining output from qBittorrent and $JELLYFIN_DIR"
-cat "TEMPDIR/qb−files.txt""TEMP_DIR/qb-files.txt" "TEMP_DIR/jellyfin-files.txt" | sort | uniq > "$TEMP_DIR/tracked-files.txt"
+cat "$TEMP_DIR/qb-files.txt" "$TEMP_DIR/jellyfin-files.txt" | sort | uniq > "$TEMP_DIR/tracked-files.txt"
 
 # Find untracked files
 echo "Comparing output from previous step to list of files in $DOWNLOADS_DIR"
