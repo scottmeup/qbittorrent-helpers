@@ -14,6 +14,8 @@ RECYCLE_BIN="/recyclingbin"
 # Output file for untracked files
 OUTPUT_FILE="untracked-files.txt"
 
+> "$OUTPUT_FILE" # Clear the output file
+
 # Temporary files
 TEMP_DIR="/tmp/qb-script"
 EXISTING_TEMP_DIR=false
@@ -68,9 +70,12 @@ if [[ -f "$EXCLUDE_PATHS_FILE" ]]; then
     while IFS= read -r line; do
         EXCLUDE_PATHS+=("-path" "$line" "-prune" "-o")
     done < "$EXCLUDE_PATHS_FILE"
+  echo "Excluding $EXCLUDE_PATHS from cleanup"
 fi
 
-echo "Processing qBittorrent instances..."
+pause
+
+echo "Processing $(wc -l < "$QB_INSTANCES_FILE") qBittorrent instances..."
 > "$TEMP_DIR/qb-files.txt"  # Empty the file
 
 # Read qBittorrent instances from the file
@@ -86,6 +91,7 @@ while IFS=" " read -r instance_name url user pass; do
 
     echo "[$instance_name] Fetching files from $url..."
     get_qbittorrent_files "$url" "$cookie_file" >> "$TEMP_DIR/qb-files.txt"
+    echo "$(wc -l < "$TEMP_DIR/qb-files.txt") total torrents imported"
 done < "$QB_INSTANCES_FILE"
 
 # Sort qBittorrent output
