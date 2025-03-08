@@ -14,11 +14,11 @@ RECYCLE_BIN="/recyclingbin"
 # Output file for untracked files
 OUTPUT_FILE="untracked-files.txt"
 
-> "$OUTPUT_FILE" # Clear the output file
-
 # Temporary files
 TEMP_DIR="/tmp/qb-script"
 EXISTING_TEMP_DIR=false
+
+> "$OUTPUT_FILE" # Clear the output file
 
 if [ -d "$TEMP_DIR" ]; then
     EXISTING_TEMP_DIR=true
@@ -47,7 +47,7 @@ get_qbittorrent_files() {
 }
 
 
-echo "Mapping inodes"
+echo "Mapping $DOWNLOADS_DIR inodes"
 # Extract inodes from DOWNLOADS_DIR in one pass
 declare -A DOWNLOADS_INODES
 while read -r inode; do
@@ -64,13 +64,13 @@ get_jellyfin_hardlinks() {
     done
 }
 
-# Read exclusion paths
-EXCLUDE_PATHS=()
+# Build find command with exclusions
+EXCLUDE_ARGS=()
 if [[ -f "$EXCLUDE_PATHS_FILE" ]]; then
     while IFS= read -r line; do
-        EXCLUDE_PATHS+=("-path" "$line" "-prune" "-o")
+        [[ -n "$line" ]] && EXCLUDE_ARGS+=("-path" "$DOWNLOADS_DIR/$line" "-prune" "-o")
     done < "$EXCLUDE_PATHS_FILE"
-  echo "Excluding $EXCLUDE_PATHS from cleanup"
+    echo "Excluding: ${EXCLUDE_ARGS[*]}"
 fi
 
 pause
@@ -102,9 +102,9 @@ sort -u "$TEMP_DIR/qb-files.txt" -o "$TEMP_DIR/qb-files.txt"
 echo "Finding hardlinked files from $JELLYFIN_DIR"
 get_jellyfin_hardlinks > "$TEMP_DIR/jellyfin-files.txt"
 
-# Get all files in /downloads (excluding directories)
+# Get all files in /downloads (excluding directories and excluded paths)
 echo "Building list of files in $DOWNLOADS_DIR"
-find "$DOWNLOADS_DIR" "${EXCLUDE_PATHS[@]}" -type f -print | sort > "$TEMP_DIR/all-files.txt"
+find "$DOWNLOADS_DIR" "${EXCLUDE_ARGS[@]}" -type f -print | sort > "$TEMP_DIR/all-files.txt"
 
 # Combine qBittorrent and Jellyfin file lists
 echo "Combining output from qBittorrent and $JELLYFIN_DIR"
@@ -122,7 +122,7 @@ if [[ -s "$OUTPUT_FILE" ]]; then
     echo "Choose an action:"
     echo "1) Delete files"
     echo "2) Move files to recycle bin"
-    echo "3) Display hard link count"
+    echo "3) Display hard link count of untracked files"
     echo "4) Do nothing"
     read -r choice
 
